@@ -7,13 +7,21 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/rounakkumarsingh/pokedex/internal/pokedexapi"
 )
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(*Config) error
 }
+
+type Config struct {
+	mapOffset int
+}
+
+var config Config
 
 var commands map[string]cliCommand
 
@@ -29,10 +37,20 @@ func init() {
 			description: "Displays a help message",
 			callback:    commandHelp,
 		},
+		"map": {
+			name:        "map",
+			description: "lists location",
+			callback:    commandMap,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "See the previous list",
+			callback:    commandMapb,
+		},
 	}
 }
 
-func commandExit() error {
+func commandExit(_ *Config) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return ErrExit
@@ -40,7 +58,7 @@ func commandExit() error {
 
 var ErrExit = errors.New("exit")
 
-func commandHelp() error {
+func commandHelp(_ *Config) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
 	fmt.Println()
@@ -59,20 +77,46 @@ func commandHelp() error {
 	return nil
 }
 
+func commandMap(config *Config) error {
+	s := pokedexapi.GetLocations(&config.mapOffset)
+	for _, v := range s {
+		fmt.Println(v)
+	}
+	return nil
+}
+
+func commandMapb(config *Config) error {
+	config.mapOffset -= 40
+	if config.mapOffset < 0 {
+		config.mapOffset = 0
+		fmt.Println("You are at the start")
+		return nil
+	}
+	return commandMap(config)
+}
+
 func main() {
 
 	s := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("Pokedex > ")
 		s.Scan()
-		words := s.Text()
-		switch words {
+		args := cleanInput(s.Text())
+		switch args[0] {
 		case "exit":
-			if err := commands["exit"].callback(); err != ErrExit {
+			if err := commands["exit"].callback(&config); err != ErrExit {
 				panic(err)
 			}
 		case "help":
-			if err := commandHelp(); err != nil {
+			if err := commandHelp(&config); err != nil {
+				panic(err)
+			}
+		case "map":
+			if err := commandMap(&config); err != nil {
+				panic(err)
+			}
+		case "mapb":
+			if err := commandMapb(&config); err != nil {
 				panic(err)
 			}
 		}
