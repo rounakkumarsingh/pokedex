@@ -130,7 +130,7 @@ func commandCatch(_ *Config, args ...string) error {
 		}
 		return err
 	}
-	fmt.Printf("Throwing a pokeball at %s...\n", pokemon)
+	fmt.Printf("Throwing a Pokeball at %s...\n", pokemon)
 	prob := 1.0 / (1.0 + math.Exp(-(float64(pokemonInfo.BaseExperience))))
 	u := rand.Float64()
 	if u < prob {
