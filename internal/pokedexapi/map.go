@@ -2,15 +2,17 @@ package pokedexapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rounakkumarsingh/pokedex/internal/pokecache"
 )
 
-var c pokecache.Cache = pokecache.NewCache(time.Hour * 1)
+var locationCache pokecache.Cache = pokecache.NewCache(time.Second * 30)
 
 type LocationAreaAPIResponse struct {
 	ID                   int    `json:"id"`
@@ -99,7 +101,7 @@ func GetLocations(offset *int) []string {
 
 func GetLocation(offSet int) (string, error) {
 	url := fmt.Sprintf("https://pokeapi.co/api/v2/location-area/%d/", offSet)
-	e, ok := c.Get(url)
+	e, ok := locationCache.Get(url)
 	if ok {
 		return string(e), nil
 	}
@@ -117,6 +119,39 @@ func GetLocation(offSet int) (string, error) {
 	if err != nil {
 		return "", nil
 	}
-	c.Add(url, []byte(v.Name))
+	locationCache.Add(url, []byte(v.Name))
 	return v.Name, nil
+}
+
+var locationPokemonCache pokecache.Cache = pokecache.NewCache(30 * time.Second)
+
+func GetPokemons(location string) ([]string, error) {
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/location-area/%s/", location)
+	e, ok := locationPokemonCache.Get(url)
+	if ok {
+		return strings.Split(string(e), ":"), nil
+	}
+	res, err := http.Get(url)
+	if err != nil {
+		return []string{}, err
+	}
+	if res.StatusCode == 404 {
+		return []string{}, errors.New("Not Found!!")
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return []string{}, err
+	}
+	res.Body.Close()
+	var v LocationAreaAPIResponse
+	err = json.Unmarshal(body, &v)
+	if err != nil {
+		return []string{}, err
+	}
+	pokemons := make([]string, 0)
+	for _, pokemon := range v.PokemonEncounters {
+		pokemons = append(pokemons, pokemon.Pokemon.Name)
+	}
+	locationPokemonCache.Add(url, []byte(strings.Join(pokemons, ":")))
+	return pokemons, nil
 }

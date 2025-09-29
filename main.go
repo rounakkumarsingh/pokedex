@@ -95,6 +95,18 @@ func commandMapb(config *Config) error {
 	return commandMap(config)
 }
 
+func commandExplore(config *Config, area string) error {
+	fmt.Printf("Exploring %s\n", area)
+	pokemons, err := pokedexapi.GetPokemons(area)
+	if err != nil {
+		return err
+	}
+	for _, pokemon := range pokemons {
+		fmt.Printf(" - %s\n", pokemon)
+	}
+	return nil
+}
+
 func main() {
 
 	s := bufio.NewScanner(os.Stdin)
@@ -117,6 +129,10 @@ func main() {
 			}
 		case "mapb":
 			if err := commandMapb(&config); err != nil {
+				panic(err)
+			}
+		case "explore":
+			if err := commandExplore(&config, args[1]); err != nil {
 				panic(err)
 			}
 		}
