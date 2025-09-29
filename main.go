@@ -63,6 +63,11 @@ func init() {
 			description: "Inspect if you have a pokemon",
 			callback:    commandInspect,
 		},
+		"pokedex": cliCommand{
+			name:        "pokedex",
+			description: "You get a name of all the pokemon you have",
+			callback:    commandPokedex,
+		},
 	}
 	config.pokemons = make(map[string]pokedexapi.Pokemon)
 }
@@ -165,6 +170,19 @@ func commandInspect(config *Config, args ...string) error {
 	return nil
 }
 
+func commandPokedex(config *Config, _ ...string) error {
+	if len(config.pokemons) > 0 {
+		fmt.Println("Your Pokedex:")
+	} else {
+		fmt.Println("You don't have any pokemons")
+		return nil
+	}
+	for k := range config.pokemons {
+		fmt.Printf(" - %s\n", k)
+	}
+	return nil
+}
+
 func main() {
 	s := bufio.NewScanner(os.Stdin)
 	for {
@@ -200,6 +218,12 @@ func main() {
 			if err := commandInspect(&config, args...); err != nil {
 				panic(err)
 			}
+		case "pokedex":
+			if err := commandPokedex(&config, args...); err != nil {
+				panic(err)
+			}
+		default:
+			fmt.Println("Invalid Usage. Use the help command")
 		}
 	}
 }
