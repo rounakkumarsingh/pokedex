@@ -2,9 +2,7 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"sort"
@@ -60,16 +58,20 @@ func init() {
 			description: "Attempt to catch a pokemon",
 			callback:    commandCatch,
 		},
+		"inspect": {
+			name:        "inspect",
+			description: "Inspect if you have a pokemon",
+			callback:    commandInspect,
+		},
 	}
+	config.pokemons = make(map[string]pokedexapi.Pokemon)
 }
 
 func commandExit(_ *Config, _ ...string) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
-	return ErrExit
+	return nil
 }
-
-var ErrExit = errors.New("exit")
 
 func commandHelp(_ *Config, _ ...string) error {
 	fmt.Println("Welcome to the Pokedex!")
@@ -120,7 +122,7 @@ func commandExplore(_ *Config, args ...string) error {
 	return nil
 }
 
-func commandCatch(_ *Config, args ...string) error {
+func commandCatch(config *Config, args ...string) error {
 	pokemon := args[1]
 	pokemonInfo, err := pokedexapi.GetPokemonDetails(pokemon)
 	if err != nil {
@@ -131,13 +133,34 @@ func commandCatch(_ *Config, args ...string) error {
 		return err
 	}
 	fmt.Printf("Throwing a Pokeball at %s...\n", pokemon)
-	prob := 1.0 / (1.0 + math.Exp(-(float64(pokemonInfo.BaseExperience))))
+	prob := 1.0 - (float64(pokemonInfo.BaseExperience)-36.0)/(608.0-36.0)
 	u := rand.Float64()
 	if u < prob {
 		fmt.Printf("%s was caught!\n", pokemon)
-
+		fmt.Println("You may now inspect it with the inspect command.")
+		config.pokemons[pokemon] = pokemonInfo
 	} else {
 		fmt.Printf("%s escaped!\n", pokemon)
+	}
+	return nil
+}
+
+func commandInspect(config *Config, args ...string) error {
+	v, ok := config.pokemons[args[1]]
+	if !ok {
+		fmt.Println("you have not caught that pokemon")
+	} else {
+		fmt.Printf("Name: %s\n", v.Name)
+		fmt.Printf("Height: %d\n", v.Height)
+		fmt.Printf("Weight: %d\n", v.Weight)
+		fmt.Println("Stats")
+		for _, v := range v.Stats {
+			fmt.Printf("  -%s: %d\n", v.Stat.Name, v.BaseStat)
+		}
+		fmt.Println("Types:")
+		for _, v := range v.Types {
+			fmt.Printf("  - %s\n", v.Type.Name)
+		}
 	}
 	return nil
 }
@@ -150,7 +173,7 @@ func main() {
 		args := cleanInput(s.Text())
 		switch args[0] {
 		case "exit":
-			if err := commands["exit"].callback(&config); err != ErrExit {
+			if err := commands["exit"].callback(&config); err != nil {
 				panic(err)
 			}
 		case "help":
@@ -171,6 +194,10 @@ func main() {
 			}
 		case "catch":
 			if err := commandCatch(&config, args...); err != nil {
+				panic(err)
+			}
+		case "inspect":
+			if err := commandInspect(&config, args...); err != nil {
 				panic(err)
 			}
 		}
