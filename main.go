@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math"
+	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -14,11 +16,12 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(*Config) error
+	callback    func(*Config, ...string) error
 }
 
 type Config struct {
 	mapOffset int
+	pokemons  map[string]pokedexapi.Pokemon
 }
 
 var config Config
@@ -47,10 +50,20 @@ func init() {
 			description: "See the previous list",
 			callback:    commandMapb,
 		},
+		"explore": {
+			name:        "explore",
+			description: "Explore the pokemon",
+			callback:    commandExplore,
+		},
+		"catch": {
+			name:        "catch",
+			description: "Attempt to catch a pokemon",
+			callback:    commandCatch,
+		},
 	}
 }
 
-func commandExit(_ *Config) error {
+func commandExit(_ *Config, _ ...string) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return ErrExit
@@ -58,7 +71,7 @@ func commandExit(_ *Config) error {
 
 var ErrExit = errors.New("exit")
 
-func commandHelp(_ *Config) error {
+func commandHelp(_ *Config, _ ...string) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
 	fmt.Println()
@@ -77,7 +90,7 @@ func commandHelp(_ *Config) error {
 	return nil
 }
 
-func commandMap(config *Config) error {
+func commandMap(config *Config, _ ...string) error {
 	s := pokedexapi.GetLocations(&config.mapOffset)
 	for _, v := range s {
 		fmt.Println(v)
@@ -85,7 +98,7 @@ func commandMap(config *Config) error {
 	return nil
 }
 
-func commandMapb(config *Config) error {
+func commandMapb(config *Config, args ...string) error {
 	config.mapOffset -= 40
 	if config.mapOffset < 0 {
 		config.mapOffset = 0
@@ -95,9 +108,9 @@ func commandMapb(config *Config) error {
 	return commandMap(config)
 }
 
-func commandExplore(config *Config, area string) error {
-	fmt.Printf("Exploring %s\n", area)
-	pokemons, err := pokedexapi.GetPokemons(area)
+func commandExplore(_ *Config, args ...string) error {
+	fmt.Printf("Exploring %s...\n", args[1])
+	pokemons, err := pokedexapi.GetPokemons(args[1])
 	if err != nil {
 		return err
 	}
@@ -107,8 +120,29 @@ func commandExplore(config *Config, area string) error {
 	return nil
 }
 
-func main() {
+func commandCatch(_ *Config, args ...string) error {
+	pokemon := args[1]
+	pokemonInfo, err := pokedexapi.GetPokemonDetails(pokemon)
+	if err != nil {
+		if err.Error() == "Not Found!!" {
+			fmt.Println("IDK what that is, but it ain't a Pokemon")
+			return nil
+		}
+		return err
+	}
+	fmt.Printf("Throwing a pokeball at %s...\n", pokemon)
+	prob := 1.0 / (1.0 + math.Exp(-(float64(pokemonInfo.BaseExperience))))
+	u := rand.Float64()
+	if u < prob {
+		fmt.Printf("%s was caught!\n", pokemon)
 
+	} else {
+		fmt.Printf("%s escaped!\n", pokemon)
+	}
+	return nil
+}
+
+func main() {
 	s := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("Pokedex > ")
@@ -132,7 +166,11 @@ func main() {
 				panic(err)
 			}
 		case "explore":
-			if err := commandExplore(&config, args[1]); err != nil {
+			if err := commandExplore(&config, args...); err != nil {
+				panic(err)
+			}
+		case "catch":
+			if err := commandCatch(&config, args...); err != nil {
 				panic(err)
 			}
 		}
